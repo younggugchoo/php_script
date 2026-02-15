@@ -2,11 +2,17 @@
 /**
  * 유튜브 스타일 스크립트 동기화 페이지
  * 영상 재생 위치에 맞춰 스크립트 레이어 자동 스크롤 및 포커싱
+ * 사용: index.php?v=영상명 → 영상명.mp4, 영상명.txt 로드
  */
+$videoName = isset($_GET['v']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['v']) : '';
+if ($videoName === '') {
+    $videoName = 'videoplayback';
+}
+$videoFile = 'video/' . $videoName . '.mp4';
+$scriptFile = 'txt/' .  $videoName . '.txt';
 
-// 스크립트 로드: videoplayback.txt → videoplayback.srt → sample_script.php
-require_once __DIR__ . '/srt_loader.php';
-$scriptSegments = load_script();
+require_once __DIR__ . '/script_loader.php';
+$scriptSegments = load_script($scriptFile);
 $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] : 30;
 ?>
 <!DOCTYPE html>
@@ -136,6 +142,12 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
             color: #888;
             margin-bottom: 4px;
         }
+        .script-empty {
+            margin: 0;
+            padding: 16px;
+            color: #888;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -143,7 +155,7 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
         <div class="video-wrap">
             <!-- video.php로 재생 시 Range 요청 지원 → 타임라인(seek) 가능 -->
             <video id="player" controls playsinline>
-                <source src="video.php?f=videoplayback.mp4" type="video/mp4">
+                <source src="video.php?f=<?= htmlspecialchars($videoFile) ?>" type="video/mp4">
                 <!-- 브라우저가 비디오 재생을 지원하지 않습니다. -->
             </video>
             <p class="test-mode" id="testModeNotice" style="display:none; margin-top:8px; color:#888; font-size:0.9rem;">
@@ -159,13 +171,16 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
         <div class="script-panel" id="scriptPanel">
             <h3>스크립트</h3>
             <div class="script-list" id="scriptList">
-                <?php foreach ($scriptSegments as $i => $seg): ?>
-                <div class="script-line" data-start="<?= (float)$seg['start'] ?>" data-end="<?= (float)$seg['end'] ?>" data-index="<?= $i ?>">
-                    <!-- <span class="time-badge"><?= gmdate('i:s', (int)$seg['start']) ?> - <?= gmdate('i:s', (int)$seg['end']) ?></span> -->
-                    <span class="time-badge"><?= gmdate('i:s', (int)$seg['start']) ?></span>
-                    <span class="text"><?= htmlspecialchars($seg['text']) ?></span>
-                </div>
-                <?php endforeach; ?>
+                <?php if (!empty($scriptSegments)): ?>
+                    <?php foreach ($scriptSegments as $i => $seg): ?>
+                    <div class="script-line" data-start="<?= (float)$seg['start'] ?>" data-end="<?= (float)$seg['end'] ?>" data-index="<?= $i ?>">
+                        <span class="time-badge"><?= gmdate('i:s', (int)$seg['start']) ?></span>
+                        <span class="text"><?= htmlspecialchars($seg['text']) ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="script-empty">해당 영상의 스크립트가 없습니다.</p>
+                <?php endif; ?>
             </div>
         </div>
     </div>

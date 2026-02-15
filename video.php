@@ -6,11 +6,11 @@
  */
 $baseDir = __DIR__ . DIRECTORY_SEPARATOR;
 $file = isset($_GET['f']) ? $_GET['f'] : '';
-if ($file === '' || preg_match('/[^a-zA-Z0-9_.-]/', $file)) {
+if ($file === '' || strpos($file, '..') !== false || preg_match('/[^a-zA-Z0-9_.\-\/\\\\]/', $file)) {
     http_response_code(400);
     exit('Bad request');
 }
-$path = realpath($baseDir . $file);
+$path = realpath($baseDir . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $file));
 if ($path === false || !is_file($path) || strpos($path, $baseDir) !== 0) {
     http_response_code(404);
     exit('Not found');

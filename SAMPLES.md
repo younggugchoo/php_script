@@ -2,9 +2,8 @@
 
 ## 스크립트 (로드 순서)
 
-1. **videoplayback.txt** – 시간줄(M:SS) + 텍스트줄 형식 (권장)
-2. **videoplayback.srt** – 표준 SRT 형식
-3. **sample_script.php** – videoplayback_script.json 또는 내장 fallback
+1. **videoplayback.txt** – 시간줄(M:SS) + 텍스트줄 형식
+2. **sample_script.php** – 실패 시 videoplayback_script.json 또는 내장 fallback
 
 스크립트 구간을 바꾸려면 `videoplayback.txt`를 수정하거나, JSON 형식이면 `videoplayback_script.json`을 수정하면 됩니다.
 

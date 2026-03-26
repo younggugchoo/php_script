@@ -1,45 +1,61 @@
 <?php
 /**
  * 스크립트 파일 로더
- * 영상명.txt (시간줄 M:SS + 텍스트줄) → 실패 시 sample_script.php
+ * - WebVTT (.vtt): HH:MM:SS.mmm --> HH:MM:SS.mmm + 텍스트 (sample.vtt 형식)
+ * 실패 시 sample_script.php
  */
 
-/** M:SS 또는 H:MM:SS 를 초로 변환 */
-function parse_time_simple($s) {
+/** WebVTT 시간 (HH:MM:SS.mmm) 를 초로 변환 */
+function parse_time_vtt($s) {
     $s = trim($s);
-    if (preg_match('/^(\d+):(\d+):(\d+)$/', $s, $m)) {
-        return (int)$m[1] * 3600 + (int)$m[2] * 60 + (int)$m[3];
+    if (preg_match('/^(\d+):(\d+):(\d+)\.(\d+)$/', $s, $m)) {
+        return (int)$m[1] * 3600 + (int)$m[2] * 60 + (int)$m[3] + (int)$m[4] / 1000;
     }
-    if (preg_match('/^(\d+):(\d+)$/', $s, $m)) {
-        return (int)$m[1] * 60 + (int)$m[2];
+    if (preg_match('/^(\d+):(\d+)\.(\d+)$/', $s, $m)) {
+        return (int)$m[1] * 60 + (int)$m[2] + (int)$m[3] / 1000;
     }
     return 0.0;
 }
 
-/** 한 줄에 시간(M:SS), 다음 줄에 텍스트 형식 파싱 */
-function parse_txt_script($content) {
-    $lines = preg_split('/\r\n|\r|\n/', trim(str_replace("\r\n", "\n", $content)));
+/** WebVTT 형식 파싱 (sample.vtt 구조) */
+function parse_vtt($content) {
+    $lines = preg_split('/\r\n|\r|\n/', $content);
     $segments = [];
     $i = 0;
-    $defaultEndGap = 5;
-    while ($i < count($lines)) {
+    $len = count($lines);
+    while ($i < $len) {
         $line = trim($lines[$i]);
-        if ($line === '' || !preg_match('/^\d+:\d+(:\d+)?$/', $line)) {
-            $i++;
-            continue;
-        }
-        $start = parse_time_simple($line);
         $i++;
-        $text = ($i < count($lines)) ? trim($lines[$i]) : '';
-        $i++;
-        if ($text === '') continue;
-        $end = $start + $defaultEndGap;
-        if ($i < count($lines) && preg_match('/^\d+:\d+(:\d+)?$/', trim($lines[$i]))) {
-            $end = parse_time_simple(trim($lines[$i]));
+        if ($line === '' || $line === 'WEBVTT') continue;
+        if (preg_match('/^(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})/', $line, $m)) {
+            $start = parse_time_vtt($m[1]);
+            $end = parse_time_vtt($m[2]);
+            $textLines = [];
+            while ($i < $len) {
+                $next = trim($lines[$i]);
+                if ($next === '') break;
+                $textLines[] = $next;
+                $i++;
+            }
+            $text = implode(' ', $textLines);
+            if ($text !== '') {
+                $segments[] = ['start' => $start, 'end' => $end, 'text' => $text];
+            }
         }
-        $segments[] = ['start' => $start, 'end' => $end, 'text' => $text];
     }
     return $segments;
+}
+
+/** 화면 표시용 시간 포맷: 60분 미만 mm:ss, 60분 이상 hh:mm:ss */
+function format_display_time($seconds) {
+    $s = (float) $seconds;
+    $h = (int) floor($s / 3600);
+    $m = (int) floor(fmod($s, 3600) / 60);
+    $sec = (int) floor(fmod($s, 60));
+    if ($h >= 1) {
+        return sprintf('%d:%02d:%02d', $h, $m, $sec);
+    }
+    return sprintf('%d:%02d', $m, $sec);
 }
 
 /** 파일 읽기 + UTF-8 인코딩 보정 */
@@ -57,23 +73,24 @@ function read_script_file($path) {
 }
 
 /**
- * 영상명.txt 로드.
- * 기본(videoplayback.txt)만 실패 시 sample_script.php 사용.
- * 그 외 영상명은 파일 없음/비어있으면 빈 배열 반환.
+ * 영상명 스크립트 로드. .vtt 파일만 사용.
+ * 기본(videoplayback)만 실패 시 sample_script.php 사용.
  */
 function load_script($scriptFilename = null) {
     if ($scriptFilename === null || $scriptFilename === '') {
-        $scriptFilename = 'videoplayback.txt';
+        $scriptFilename = 'txt/videoplayback.vtt';
     }
     if (strpos($scriptFilename, '..') !== false || preg_match('/[^a-zA-Z0-9_.\-\/\\\\]/', $scriptFilename)) {
         return [];
     }
-    $path = __DIR__ . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $scriptFilename);
-    $content = read_script_file($path);
-    if ($content !== null) {
-        $segments = parse_txt_script($content);
+    $base = preg_replace('/\.vtt$/i', '', $scriptFilename);
+    $path = __DIR__ . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $base . '.vtt');
+    $content = is_file($path) && is_readable($path) ? read_script_file($path) : null;
+    if ($content !== null && $content !== '') {
+        $segments = parse_vtt($content);
         if (!empty($segments)) return $segments;
     }
-    $isDefault = (basename($scriptFilename) === 'videoplayback.txt');
+    $baseName = basename($base);
+    $isDefault = ($baseName === 'videoplayback');
     return $isDefault ? require __DIR__ . '/sample_script.php' : [];
 }

@@ -2,14 +2,14 @@
 /**
  * 유튜브 스타일 스크립트 동기화 페이지
  * 영상 재생 위치에 맞춰 스크립트 레이어 자동 스크롤 및 포커싱
- * 사용: index.php?v=영상명 → 영상명.mp4, 영상명.txt 로드
+ * 사용: index.php?v=영상명 → 영상명.mp4, 영상명.vtt 로드
  */
 $videoName = isset($_GET['v']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['v']) : '';
 if ($videoName === '') {
     $videoName = 'videoplayback';
 }
 $videoFile = 'video/' . $videoName . '.mp4';
-$scriptFile = 'txt/' .  $videoName . '.txt';
+$scriptFile = 'txt/' . $videoName . '.vtt';
 
 require_once __DIR__ . '/script_loader.php';
 $scriptSegments = load_script($scriptFile);
@@ -126,6 +126,9 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
             transition: background 0.2s, border-color 0.2s;
             cursor: pointer;
             line-height: 1.5;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
         }
         .script-line:hover {
             background: #333;
@@ -138,9 +141,18 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
             color: #ff6450;
         }
         .time-badge {
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             color: #888;
-            margin-bottom: 4px;
+            margin-bottom: 0;
+            flex: 0 0 auto;
+            width: 72px;
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            letter-spacing: 0.2px;
+        }
+        .script-line .text {
+            flex: 1 1 auto;
+            min-width: 0;
         }
         .script-empty {
             margin: 0;
@@ -170,11 +182,11 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
         </div>
         <div class="script-panel" id="scriptPanel">
             <h3>스크립트</h3>
-            <div class="script-list" id="scriptList">
+            <div class="script-list" id="scriptList">   
                 <?php if (!empty($scriptSegments)): ?>
                     <?php foreach ($scriptSegments as $i => $seg): ?>
                     <div class="script-line" data-start="<?= (float)$seg['start'] ?>" data-end="<?= (float)$seg['end'] ?>" data-index="<?= $i ?>">
-                        <span class="time-badge"><?= gmdate('i:s', (int)$seg['start']) ?></span>
+                        <span class="time-badge"><?= format_display_time($seg['start']) ?></span>
                         <span class="text"><?= htmlspecialchars($seg['text']) ?></span>
                     </div>
                     <?php endforeach; ?>
@@ -212,6 +224,8 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
 
     function setActive(index) {
         if (index === lastActiveIndex) return;
+
+        console.log(index);
         for (var i = 0; i < lines.length; i++) {
             lines[i].classList.toggle('active', i === index);
         }
@@ -239,7 +253,7 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
                     var slider = document.getElementById('timeSimulator');
                     var display = document.getElementById('timeDisplay');
                     if (slider) { slider.value = start; }
-                    if (display) { display.textContent = Math.floor(start / 60) + ':' + ('0' + Math.floor(start % 60)).slice(-2); }
+                    if (display) { display.textContent = formatTimeDisplay(start); }
                 } else {
                     player.currentTime = start;
                     function playAfterSeek() {
@@ -269,10 +283,18 @@ $videoDuration = !empty($scriptSegments) ? (float) end($scriptSegments)['end'] :
         if (testSliderWrap) testSliderWrap.style.display = 'block';
     });
 
+    function formatTimeDisplay(sec) {
+        var s = Math.floor(sec);
+        var h = Math.floor(s / 3600);
+        var m = Math.floor((s % 3600) / 60);
+        var ss = s % 60;
+        if (h >= 1) return h + ':' + ('0' + m).slice(-2) + ':' + ('0' + ss).slice(-2);
+        return m + ':' + ('0' + ss).slice(-2);
+    }
     if (timeSimulator) {
         timeSimulator.addEventListener('input', function() {
             simulatedTime = parseFloat(this.value);
-            if (timeDisplay) timeDisplay.textContent = Math.floor(simulatedTime / 60) + ':' + ('0' + Math.floor(simulatedTime % 60)).slice(-2);
+            if (timeDisplay) timeDisplay.textContent = formatTimeDisplay(simulatedTime);
             updateFromTime();
         });
     }
